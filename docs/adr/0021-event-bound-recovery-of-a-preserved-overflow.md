@@ -1,0 +1,24 @@
+# Event-bound, engineer-approved recovery of a preserved `needs_rescope` overflow
+
+Status: superseded by [ADR 0062](0062-delete-needs-rescope-keep-legacy-runs-readable.md) — the flags, the recovery decision and its consume-once record are deleted; old Runs keep their events.
+
+[ADR 0019](0019-measured-diff-cap-overflow-stops-the-chain.md) made a measured diff-cap overflow stop the Chain, preserve the worktree and handoff intact, and close the Run as `needs_rescope` — terminal, with the only listed transition an explicit engineer discard. That preserved the work but left no controlled way back: the earlier idea was that recovery "belongs to a follow-up." Without it, the only real choices were to discard the preserved work or to start a fresh Run against the same branch, and neither is what an overflow calls for — the ticket needs re-scoping, not deletion.
+
+This ADR keeps ADR 0019's stop and preservation exactly as they are and adds the one missing piece: an explicit, recorded, event-bound recovery decision that reopens the preserved Run for re-planning.
+
+1. **Recovery is a decision, not a flag.** A `needs_rescope` Run reopens only through `lime run --resume RUN_ID --rescope-event EVENT_ID --recovery-decision "<rationale>"`. The decision is recorded as a `log` event (`payload.action == "rescope_and_resume"`) whose `parent_id` is the handoff event, carrying the engineer's name and the handoff path. The two flags are only meaningful together and only on a `needs_rescope` Run; on any other outcome, or alone, the CLI refuses before any side effect.
+
+2. **The transition edge is not the authorization.** `RUN_TRANSITIONS` now lists `needs_rescope → running`, but listing it is never enough: `set_run_status` re-checks for a valid, unconsumed decision bound to the *current* handoff event and fails closed otherwise, performing the reopen as a conditional `UPDATE … WHERE status='needs_rescope'` so a stale or concurrent request cannot also reopen the Run. A decision bound to an earlier overflow, a missing or unreadable handoff artifact, or a blank rationale all refuse — never a synthesized approval.
+
+3. **Authorization is validated before side effects, recorded before the transition, and consumed once.** `--rescope-event` is checked against the latest handoff event and its artifact (`run_id` and `run_outcome` must match) before any ticket/worktree/config/port/session work. On success the decision is recorded first, then the Run reopens, and a `rescope_recovery_started` event marks the authorization consumed — so a later overflow stops again and needs a decision bound to *its own* new handoff event. A plain `--resume` after a decision was already recorded will use it and say whose decision it is using. Recovery invalidates the plan (`invalidate_from`) so the planner re-plans; the handoff bytes and the preserved worktree are left untouched.
+
+4. **Presentation never implies success or deployability.** `needs_rescope` is a warning, not a failure and never a success: the console prints a preserved-and-not-deployable panel (exit code still 1) and the CLI's `runs`/`trace`/`--summary` output name the handoff and event id and show the exact recovery command. The dashboard reads status as a word from one shared table (`needs_rescope` → "needs rescope", a `warn` tone), excluding it from the success styling `isWin` checks, and derives a rescope notice from the outcome plus the event stream — so it shows even when every phase row succeeded.
+
+We considered,
+
+- **Let the enum edge alone reopen the Run.** Rejected: an ordinary `--resume` would silently turn a preserved overflow back into a normal Run, which is exactly the "resolve it by retrying" hole ADR 0019 closed.
+- **Auto-recover an interrupted decision, or reuse one across overflows.** Rejected: a decision authorizes one re-plan of one specific measurement; reusing it would let a second, unreviewed overflow proceed without a fresh engineer decision.
+- **Make `session.ensure` accept a recorded decision.** Rejected: attachment is not recovery; reopening a Run stays the single guarded CLI transition, so `session.ensure` keeps refusing even a valid unconsumed decision.
+- **Report `needs_rescope` as a failure.** Rejected: a preserved, non-deployable Run that still needs an engineer decision is a different outcome from a fail, and the console, CLI and dashboard must all say so.
+
+Trade-offs accepted: recovery costs an explicit engineer decision per overflow and one re-plan of the invalidated plan, so an overflow interrupted mid-recovery still needs its decision re-recorded — the cost of never reopening a preserved Run without saying so out loud. Core overflow accounting, early checks, verification-cache invalidation and general budget-aware ticket-cutting guidance remain out of scope.

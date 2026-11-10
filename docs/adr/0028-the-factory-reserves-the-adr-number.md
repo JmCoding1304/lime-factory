@@ -1,0 +1,25 @@
+# The factory reserves the ADR number; the documenter proposes and the owner accepts
+
+[ADR 0006](0006-git-is-ticket-numbering-ledger.md) made git the ticket-numbering ledger and CAS-reserved `refs/lime/tickets/<NN>` on origin, but ADRs kept his own rule: the documenter ran post-commit on the diff alone, picked "the next free number" from local `docs/adr/*.md`, and wrote `Status: accepted` — and nobody reviewed the number or the status. Two agents numbering themselves against one directory collide: shop-api got two `0012` and three `0013`. The failure mode is a decision record that silently claims its own authority and a number that names two different decisions.
+
+This ADR gives ADRs their own ledger and moves the number out of the documenter's hands.
+
+1. **A second, independent ledger.** `refs/lime/adr/<NNNN>` (zero-padded to four digits; ticket refs stay unpadded — their historical name is part of ADR 0006's ledger). `reserve(..., namespace=...)` takes the namespace as a parameter, defaulting to the ticket ledger, so ticket numbering is unchanged. A ticket ref and an ADR ref of the same number never collide: the namespaces are separate and are read separately.
+
+2. **The next ADR number is `1 + max` over three sources**, `next_adr_number(root)`: local `docs/adr/*.md`, the origin default branch's `docs/adr/` tree (`git ls-tree origin/<default> docs/adr/`, no checkout), and origin's `refs/lime/adr/*` refs. Ticket commits, ticket refs, branch names and `gh` PRs are not ADR sources — the ADR ledger has nothing to do with PR queries, so `next_adr_number` never calls `gh`. With no origin only local files count (a missing or empty directory yields 1), and the reservation is intentionally unreserved.
+
+3. **The factory reserves before the documenter runs.** `reserve_adr(root, run_id)` CAS-creates the ref through the same compare-and-swap push ADR 0006 established; gaps are fine, exactly as with tickets, because reservation refs are never deleted — they are the ledger. Ownership is the **Run ID**, not the ticket stem: a Run re-launched for the same ticket returns the number it already holds, durable across clones because ownership is read from each ref's fetched object, not from a local cache. A genuine collision (another Run claimed the number) recalculates and retries; a failed transport, a missing parent object or a rejected push with no competing ref propagates `NumberingError` rather than looping.
+
+4. **The number is injected into the prompt.** The `document` phase reserves once, before the `AgentCall`, and appends `ADR number: <NNNN> (reserved — use it or write no ADR)` and `Review: <context_handoff_dir>/review.md`. The documenter never selects a number; it uses the one from the prompt or writes no ADR. Reservation happens even when no ADR is written (the gap is the point), is skipped on a successful replay (the prior pass already reserved), and a reservation failure prevents the agent call and fails the phase. This does not add a reviewer pass over the ADR — that stays out of scope.
+
+5. **The documenter proposes; the owner accepts.** The ADR is written with `Status: proposed`. "Accepted" is a decision only the owner makes, at merge. The documenter also reads the review at `Review:` first and treats a behaviour the reviewer contested as not doctrine, and it never adds a rule sentence to AGENTS.md, CLAUDE.md or any doc — it fixes only a command, path or name the diff made false.
+
+We considered,
+
+- **Keep local `docs/adr/*.md` as the only source and let the documenter pick.** Rejected: two concurrent Runs numbering from the same directory collide, which is exactly the duplicate-number failure ADR 0006 already paid to fix for tickets.
+- **Share the ticket ledger and its namespace.** Rejected: an ADR is not a ticket; the two sequences are independent and interleaving them would force ADR numbers to track ticket churn and couple two unrelated ledgers.
+- **Own the ADR reservation by the ticket stem, like tickets.** Rejected: a ticket may spawn several Runs and only one of them documents; the Run is the unit that reserves and writes, so the Run ID is the correct holder.
+- **Have the documenter write `Status: accepted` directly.** Rejected: a decision record that stamps itself accepted has no owner's signature; `proposed` at write time and acceptance at merge keeps the human decision explicit.
+- **Cache the owned number locally.** Rejected: a local cache is lost in another clone and can go stale; ownership is read from the ledger's own fetched objects, so a resume in any clone finds the same number.
+
+Trade-offs accepted: every document phase now pays a read-only remote query and a possible reservation push even when the diff earns no ADR, leaving permanent gaps in the sequence — the price of never issuing one number twice. An originless clone gets an unreserved number that is not globally idempotent if files change underneath it. Renumbering shop-api's existing collisions is out of scope; they stand as the record of the bug this prevents.

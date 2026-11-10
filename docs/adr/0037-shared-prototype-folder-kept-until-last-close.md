@@ -1,0 +1,18 @@
+# A shared prototype folder survives until the last open ticket closes
+
+`commit_docs` deleted the directory named by a ticket's `Prototype:` header as part of delete-on-close. Nothing checked whether anyone else still needed it. A prototype route is Upstream work that several tickets cut from the same map can point at — in demo-app, `prototypes/home/` is named by six open tickets — so the first ticket to close ran `shutil.rmtree` and destroyed the route the other five were still reading. The route is throwaway, but it is throwaway per *set* of tickets, not per ticket.
+
+1. **A directory `Prototype:` is removed only when the authoritative ticket set holds no other open claim.** The holders are the ticket files in the engineer's main checkout `.lime/tickets/` that (a) are not the closing ticket's own file, (b) carry `Status: open` in their header, and (c) carry a nonempty `Prototype:` naming the folder or a path inside it. When that set is empty, `commit_docs` deletes as before; when it is nonempty, the folder is kept and the skip is logged with the holding ticket files. The last ticket to close, once the others are gone, deletes it.
+
+2. **The store is the main checkout, resolved through git, never the worktree's own ticket list.** A Run operates in its linked worktree, which holds only the Run's own ticket; the shared set lives in the primary checkout. The lookup (`git worktree list --porcelain`, first record) names the primary checkout from inside a linked worktree and from the primary checkout itself, and is read-only — no remote, no authentication, no `repo_root()` redirect. Matching is by normalized path components in the primary-checkout namespace, equality or descendant only, so a merely prefixed sibling or a parent-only reference does not hold the folder.
+
+3. **Any uncertainty keeps the folder.** When the main checkout cannot be identified, its `.lime/tickets/` is missing or unreadable, a ticket file cannot be read or decoded, or the prototype cannot be mapped into the primary namespace, `commit_docs` keeps the folder and logs the reason. Only a store enumerated and read completely licenses deletion. The ticket unlink and the docs commit still proceed, so the phase succeeds either way; a directory prototype on a replayed `commit_docs` is left untouched.
+
+We considered,
+
+- **Read the ticket set from the Run's own worktree.** Rejected: the worktree holds only the Run's own ticket, so every close would look like the last one and delete a shared folder.
+- **Delete only when the closing ticket is the newest `Prototype:` holder, or take a count from git history.** Rejected: history cannot tell an open ticket from a closed or hand-deleted one, and the live set is what matters.
+- **Keep every directory prototype forever.** Rejected: the route is dead weight once no ticket consumes it; the folder should go with the last close, as it did before, so `ls` stays honest.
+- **Fail the phase when the ticket source is unavailable.** Rejected: the close commit is otherwise complete; a missing or unreadable side store is an uncertainty about a cleanup, not a reason to lose the work. Keeping the folder is the safe side of the trade.
+
+Trade-offs accepted: the close path now reaches outside the Run's worktree, into the engineer's main checkout, and its verdict depends on that checkout's current ticket files — so the same Run can keep a folder that a later close would delete, and a folder whose holders were removed by hand outside the factory stays behind for the engineer. Deleting a file `Prototype:` is still never done (ADR 0036), and the worktree, reservation, carry-commit and launch-time checks are unchanged.

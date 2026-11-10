@@ -1,0 +1,190 @@
+{
+  "about": "The one liveness rule's shared corpus, read by lime status (tests/test_tracer.py, tests/test_status.py) and the dashboard feed (dashboard/server/feed.test.ts). Stamps are whole-second +00:00 ISO. `now` is 2026-11-06T12:00:00+00:00 for every case. Run and batch rows share the rule.",
+  "cases": [
+    {
+      "name": "fresh beat",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "run", "pid": 1111, "started_at": "2026-11-06T08:00:00+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:59:50+00:00"}
+      ],
+      "alive_pids": [],
+      "verdict": "live"
+    },
+    {
+      "name": "stale beat",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "run", "pid": 2222, "started_at": "2026-11-06T08:00:00+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:59:00+00:00"}
+      ],
+      "alive_pids": [2222],
+      "verdict": "dead"
+    },
+    {
+      "name": "beat at the 45 s edge",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "run", "pid": 3333, "started_at": "2026-11-06T08:00:00+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:59:15+00:00"}
+      ],
+      "alive_pids": [3333],
+      "verdict": "dead"
+    },
+    {
+      "name": "null beat, pid alive",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "run", "pid": 4444, "started_at": "2026-11-06T08:00:00+00:00", "ended_at": null, "heartbeat_at": null}
+      ],
+      "alive_pids": [4444],
+      "verdict": "live"
+    },
+    {
+      "name": "null beat, pid dead",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "run", "pid": 5555, "started_at": "2026-11-06T08:00:00+00:00", "ended_at": null, "heartbeat_at": null}
+      ],
+      "alive_pids": [],
+      "verdict": "dead"
+    },
+    {
+      "name": "no row, young run",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T11:59:50+00:00"},
+      "processes": [],
+      "alive_pids": [],
+      "verdict": "starting"
+    },
+    {
+      "name": "no row, old run",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T11:55:00+00:00"},
+      "processes": [],
+      "alive_pids": [],
+      "verdict": "dead"
+    },
+    {
+      "name": "resumed, stopped old row and fresh new row",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "run", "pid": 8181, "started_at": "2026-11-06T08:00:00+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:50:00+00:00"},
+        {"kind": "run", "pid": 8282, "started_at": "2026-11-06T11:59:00+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:59:55+00:00"}
+      ],
+      "alive_pids": [],
+      "verdict": "live"
+    },
+    {
+      "name": "resumed, stopped old row only",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T11:00:00+00:00"},
+      "processes": [
+        {"kind": "run", "pid": 9191, "started_at": "2026-11-06T11:00:00+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:50:00+00:00"}
+      ],
+      "alive_pids": [9191],
+      "verdict": "dead"
+    },
+    {
+      "name": "closed row with a fresh beat",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "run", "pid": 1010, "started_at": "2026-11-06T08:00:00+00:00", "ended_at": "2026-11-06T11:30:00+00:00", "heartbeat_at": "2026-11-06T11:59:55+00:00"}
+      ],
+      "alive_pids": [1010],
+      "verdict": "dead"
+    },
+    {
+      "name": "deploy row beating",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "deploy",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "run", "pid": 1100, "started_at": "2026-11-06T08:00:00+00:00", "ended_at": "2026-11-06T09:00:00+00:00", "heartbeat_at": "2026-11-06T09:00:00+00:00"},
+        {"kind": "deploy", "pid": 1111, "started_at": "2026-11-06T11:59:50+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:59:55+00:00"}
+      ],
+      "alive_pids": [],
+      "verdict": "live"
+    },
+    {
+      "name": "run kind ignores a beating deploy row",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "R1", "started_at": "2026-11-06T11:00:00+00:00"},
+      "processes": [
+        {"kind": "deploy", "pid": 1212, "started_at": "2026-11-06T11:59:50+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:59:55+00:00"}
+      ],
+      "alive_pids": [],
+      "verdict": "dead"
+    },
+    {
+      "name": "batch row beating",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "batch",
+      "run": {"run_id": "B1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "batch", "pid": 1300, "started_at": "2026-11-06T11:00:00+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:59:55+00:00"}
+      ],
+      "alive_pids": [],
+      "verdict": "live"
+    },
+    {
+      "name": "batch closed by SIGTERM or Ctrl-C",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "batch",
+      "run": {"run_id": "B1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "batch", "pid": 1301, "started_at": "2026-11-06T11:00:00+00:00", "ended_at": "2026-11-06T11:59:58+00:00", "heartbeat_at": "2026-11-06T11:59:55+00:00"}
+      ],
+      "alive_pids": [1301],
+      "verdict": "dead"
+    },
+    {
+      "name": "batch killed by SIGKILL or SIGHUP, stale beat",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "batch",
+      "run": {"run_id": "B1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "batch", "pid": 1302, "started_at": "2026-11-06T11:00:00+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:59:00+00:00"}
+      ],
+      "alive_pids": [],
+      "verdict": "dead"
+    },
+    {
+      "name": "batch stale beat beats a reused live pid",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "batch",
+      "run": {"run_id": "B1", "started_at": "2026-11-06T08:00:00+00:00"},
+      "processes": [
+        {"kind": "batch", "pid": 1303, "started_at": "2026-11-06T11:00:00+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:58:00+00:00"}
+      ],
+      "alive_pids": [1303],
+      "verdict": "dead"
+    },
+    {
+      "name": "run kind ignores a beating batch row",
+      "now": "2026-11-06T12:00:00+00:00",
+      "kind": "run",
+      "run": {"run_id": "B1", "started_at": "2026-11-06T11:00:00+00:00"},
+      "processes": [
+        {"kind": "batch", "pid": 1304, "started_at": "2026-11-06T11:59:50+00:00", "ended_at": null, "heartbeat_at": "2026-11-06T11:59:55+00:00"}
+      ],
+      "alive_pids": [],
+      "verdict": "dead"
+    }
+  ]
+}

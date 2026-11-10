@@ -1,0 +1,15 @@
+# Fresh-session recovery for a text-only tool-call leak, per-Role `tool_choice`
+
+A provider once dropped the opening `<tool_call>` tag and returned the call as plain text; the reply had no structured tool call and no accepted `submit`, so the Spine treated it as a normal correction and re-sent the poisoned conversation — both same-session retries copied the leaked text (8/8 replays leaked). Two changes close this: a per-Role `tool_choice` switch that forces structured calls at the provider, and a leak-recovery path in the retry loop.
+
+1. **Per-Role `tool_choice` (default `auto`).** Every pi Role ends by calling `submit`, which sets `terminate: true`, so a Role never legitimately needs a text-only turn. When a Role is configured `required` (the scout default in both config templates), the `submit.ts` extension's `before_provider_request` hook injects `tool_choice: "required"` into the OpenAI-compatible provider payload; the value reaches the extension via `LIME_TOOL_CHOICE` from the Spine's environment — no second extension. An `auto` Role sends the payload unchanged (no field). Profiles may patch `tool_choice` like `runtime`/`model`/`thinking`/`timeout_s`.
+
+2. **Tool-call-leak recovery.** When a pi reply is otherwise successful but has no accepted submit, no rejection, no structured toolCall part, and its text matches `<function=` or `<tool_call>`, the Spine intercepts before parse/correction and, on the first such leak, opens a fresh Session via the existing `stream_fresh` allowance (ADR 0009) instead of nudging the poisoned one. The fresh prompt preserves the opening text and any in-flight correction/handoff note but never copies the leaked assistant text. The trace event is named `tool_call_leak`. At most one leak recovery per Phase — the second leak (or a leak once the allowance is already spent) fails the Phase with a clear `tool_call_leak` reason. It does not increment `continuation`.
+
+We considered three options for the leak recovery:
+
+1. **Parse the leaked XML back into a structured tool call** — rejected as out of scope; reconstructing the call from free text is fragile and provider-specific.
+2. **Retry in the same session** — the failure mode itself: the model has already committed to emitting the marker as text, so nudging re-copies the leak.
+3. **Open a fresh session via the shared `stream_fresh` allowance** — chosen. It reuses the existing stream-fresh machinery (distinct UUID/directories, context-preserving prompt, one-shot) and discards the provider state that corrupted the turn.
+
+Trade-offs accepted: the leak recovery shares the single `stream_fresh` allowance with transient stream-error recovery, so a leak after the allowance is spent (or a second leak) fails the Phase — bounded, but stricter than the in-place correction path it replaces. Forcing `required` on the scout also assumes the provider is on the OpenAI-compatible API and honors `tool_choice: "required"`; providers with a different spelling or none are out of scope (the knob is per-Role and defaults to `auto`, so only roles that opt in take that dependency).

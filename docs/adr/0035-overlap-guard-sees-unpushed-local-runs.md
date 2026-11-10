@@ -1,0 +1,25 @@
+# The overlap guard also sees this project's own unpushed Runs
+
+The **launch overlap guard** (ADR 0027) reads only unmerged `origin/lime/*` branches, and a Run pushes its branch at `push_pr`, near its end. For most of a Run's life it is invisible to the guard, so a second launch on the same paths starts and a batch starts two children that write the same file — exactly the clobber ADR 0027 set out to prevent. ADR 0027 chose the origin branch as the live set and rejected a local lock as "blind to a Run started elsewhere"; that reasoning held for a *lock*, but it left the started-but-unpushed Run unobserved. The fix reads this project's own trace rows as a second read-only source.
+
+1. **Two read-only sources feed one conflict map.** `overlap.live_overlap()` keeps the origin path (fetch `--prune`, enumerate `refs/remotes/origin/lime/**` not merged into `origin/<default>`, read each branch's *own* ticket, at its tip or else its last carried version) and adds this explicit project's `.lime/runs/lime.db` rows: `kind='run'` with a status outside `deployed`/`discarded`. Discovery reads no other project, no other clone and not `LIME_RUNS_DIR`; an absent DB is empty and is never created; nothing is written — no port, lifecycle or trace writer is touched.
+
+2. **A local holder is keyed by Run id, and named paths union per branch.** The trace row names the Run id, so local conflicts are keyed `Run <run_id> (<branch>)`; a remote-only conflict keeps the bare `lime/<workflow>/<stem>` branch key. When a branch hits both sources it collapses into the one Run-labelled entry, the candidate-order union of both tips' path hits, so a remote-only hit is never lost.
+
+3. **A Run holds from its first minute until merge or removal.** Eligibility is the row's status, not a live pid: a `running` row with no process yet (the birth window) and a stopped red Run both still hold. A live Run holds even when its carried ticket already existed at birth. A stopped row releases only when its actual branch tip is an ancestor of the fetched origin default; a dead pid or a red status is *not* release — only merge or `lime runs rm` is. Local paths come from the Run's branch-local carried ticket, not the root file.
+
+4. **The candidate's exemptions apply unchanged.** A `Blocked by:` naming the Run's ticket exempts an unpushed Run exactly as it exempts an origin branch, through the same shared ticket-to-ticket rule; `--allow-overlap` still skips only this guard, for a single fresh ticket only, and is still rejected for a batch or `--resume`.
+
+5. **A batch snapshots an in-flight child's Where before spawning it.** `_pick_ready` holds a candidate that overlaps either a live overlap or one of this process's already-spawned children, whose parsed Where is snapshotted in parent memory before the child can change the root file. This closes the spawn-to-trace-row race without a second DB writer or lock; the snapshot is parent-memory only, so a reaped child drops it and the surviving trace row stays authoritative.
+
+6. **A single unreadable row is skipped alone; a DB that cannot be read at all refuses.** A row whose branch or ticket is null, unreadable, missing, or not ticket-shaped contributes no hold and raises no error; a project-contained `.lime/tickets/<stem>.md` normalizes to its stem and a path outside the project is refused, so a row can never make discovery read an arbitrary external file. A DB-wide read failure raises `OverlapError` and the launch is refused, never assumed permission.
+
+We considered,
+
+- **Waiting for the Run to push, or pushing earlier.** Rejected: the ticket fixes the push timing (never) and the whole point is to see the Run before it pushes.
+- **A local active-ticket lock in the sense ADR 0027 rejected.** Rejected still: this is a read-only observation of recorded state, not a mutual-exclusion protocol. It promises no atomic simultaneous-launch exclusion — two overlapping launches in the same instant may still both start.
+- **A live-pid filter on eligibility.** Rejected: a stopped red Run whose work is still on disk must keep holding until it is merged or removed; otherwise a relaunch silently overlaps preserved work.
+- **Reading `LIME_RUNS_DIR` or another clone's rows.** Rejected: the guard is bounded to this explicit project, so a Run of another project or another clone is never a holder.
+- **A second DB writer or a lock to close the batch spawn race.** Rejected: an in-memory Where snapshot keyed by the spawned child closes it with no new state and no lock.
+
+Trade-offs accepted: the guard now holds on Runs that never push, so a ticket can be held longer than before, cleared only by merge, `lime runs rm`, or `--allow-overlap`; the eligible-status rule makes a stopped red Run load-bearing until it is deliberately removed; and the batch snapshot race is closed only within one process, so a race across processes still relies on the best-effort read-only check. Reservation, `Blocked by:` semantics, push timing and the never-merge-main rule are unchanged.

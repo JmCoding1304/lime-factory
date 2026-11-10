@@ -1,0 +1,10 @@
+# Submit tool replaces text JSON for pi role envelope delivery
+
+The original agent↔system contract (Foundation spec §4) required every Role to deliver its typed Report as fenced JSON in the final assistant message; the Spine recovered it by `extract_envelope` (regex on free text). In the first 99 builder calls across real Runs, 14 envelopes were invalid JSON, 3 escalated to a dead Phase, and in commit eab0038d a correct code fix was lost because the JSON it came with was malformed. Text parsing has no schema enforcement at write time — the agent hallucinates field names, forgets commas, wraps status in quotes wrong — and the correction cycle is slow (another turn) and fragile (the agent may guess the JSON shape wrong again).
+
+We considered two responses and chose one:
+
+1. **Keep text parsing, improve the regex** — tried via `_repair_escapes` and `JSON_FIX_ATTEMPTS` already, but the root cause (free text written by a stochastic model) is not fixable by better regex. The model writes the wrong thing; regex only catches syntax errors, never content errors.
+2. **Make the envelope a tool call** — every pi role finishes by calling a `submit` tool whose `parameters` is that role's pydantic JSON Schema (whole, with `$defs`). The tool's `terminate: true` ends the turn; the Spine captures the args of the last accepted `submit` call. This is what we built.
+
+The trade-off in (2) is between reliability (the schema is enforced at the tool call boundary — pi-ai validates the args against JSON Schema before the tool runs — and the Spine sees structured dicts, not text) and complexity (one extension per Runtime, a new `envelope` field on `AgentResult`, two live delivery paths — pi uses `submit`, claude_code still parses text until its MCP `submit` server arrives). We accepted the complexity because the failure rate (14%) was blocking progress; reducing it to zero by moving validation left into the tool call itself was worth the two-path cost. The budget-stop guard had to be updated to allow `submit` when every other non-handoff tool is denied, so a `status: partial` envelope can still be delivered.

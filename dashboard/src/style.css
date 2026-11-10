@@ -1,0 +1,283 @@
+/* Locked variant A "Ledger" (spec §11, prototype 18): LimeLabs brand over a
+   paper-light default with a full dark counterpart. Light is the bare root;
+   dark applies via prefers-color-scheme unless data-theme pins a choice. */
+:root {
+  --lime: #c1f610;
+  --lime-ink: #5a7500; /* lime is too light for text on paper — this is its legible voice */
+  --purple: #9c6bff;
+  --ink: #1a1a1a;
+  --bg: #f9f9f9;
+  --surface: #ffffff;
+  --surface-2: #f1f2ee;
+  --border: #e4e6df;
+  --border-strong: #d2d5cb;
+  --text: #1a1a1a;
+  --dim: #5d6156;
+  --faint: #8b9083;
+  --dot: #dcded6; /* canvas dotted grid */
+  --ok: #4d8a00;
+  --ok-chip: #e8f7c8;
+  --run: #7a4de0;
+  --run-chip: #efe8ff;
+  --bad: #d5432c;
+  --bad-chip: #fbe7e2;
+  --warn: #b07d00;
+  --warn-chip: #fdf2cf;
+  --shadow: 0 1px 2px rgba(26, 26, 26, 0.05), 0 8px 24px rgba(26, 26, 26, 0.06);
+  --sans: 'Space Grotesk', 'Helvetica Neue', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --lime-ink: #c1f610;
+    --bg: #141414;
+    --surface: #1d1d1d;
+    --surface-2: #242424;
+    --border: #2c2c2c;
+    --border-strong: #3a3a3a;
+    --text: #f9f9f9;
+    --dim: #a8ac9f;
+    --faint: #70746a;
+    --dot: #2a2a2a;
+    --ok: #a8e00f;
+    --ok-chip: #2a3413;
+    --run: #b28bff;
+    --run-chip: #2d2247;
+    --bad: #ff7a63;
+    --bad-chip: #421f18;
+    --warn: #e8b64a;
+    --warn-chip: #3a2f12;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+}
+
+:root[data-theme='dark'] {
+  --lime-ink: #c1f610;
+  --bg: #141414;
+  --surface: #1d1d1d;
+  --surface-2: #242424;
+  --border: #2c2c2c;
+  --border-strong: #3a3a3a;
+  --text: #f9f9f9;
+  --dim: #a8ac9f;
+  --faint: #70746a;
+  --dot: #2a2a2a;
+  --ok: #a8e00f;
+  --ok-chip: #2a3413;
+  --run: #b28bff;
+  --run-chip: #2d2247;
+  --bad: #ff7a63;
+  --bad-chip: #421f18;
+  --warn: #e8b64a;
+  --warn-chip: #3a2f12;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+button {
+  font-family: var(--sans);
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.dim {
+  color: var(--dim);
+}
+
+.faint {
+  color: var(--faint);
+}
+
+/* Data chips shared by the L1 rows and the L2 run header. */
+.chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.chip.wf {
+  border: none;
+  background: var(--surface-2);
+  color: var(--dim);
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.chip.repo {
+  border: none;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.chip.repo::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--lime);
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.row-cost {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-cost.live {
+  color: var(--lime-ink);
+  font-weight: 500;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  background: var(--surface);
+}
+
+.icon-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+/* Model/provider logo badge on node cards and the panel head. */
+.role-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--surface-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.role-logo svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+/* Context-occupancy bar — node cards and the panel's bigger copy. */
+.ctxbar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-2);
+  overflow: hidden;
+  flex: 1;
+  min-width: 40px;
+}
+
+.ctx-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--lime);
+  transition: width 0.6s;
+}
+
+.ctx-fill.hot {
+  background: var(--warn);
+}
+
+.warn-tick {
+  color: var(--warn);
+  font-size: 11px;
+}
+
+.error-bar {
+  margin: 12px 24px;
+  padding: 8px 14px;
+  border: 1px solid var(--bad);
+  background: var(--bad-chip);
+  color: var(--bad);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.empty {
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--faint);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Text shimmer (RunTrace .node-live): 200%-wide gradient, highlight band moves left → right. */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

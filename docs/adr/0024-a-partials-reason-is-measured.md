@@ -1,0 +1,15 @@
+# A partial's continuation reason is measured, and a blocked second partial fails the Run
+
+Every non-nudged partial was labelled `budget` and every second partial ended the Run `budget_exhausted`, whether or not any ceiling was reached. Acmeweb `d6f174a9` :05 stopped twice at ~29k tokens and 8 minutes with time left; `35cc170d` and `90f67666` continuations stopped on unavailable browser evidence. The Run reported budget exhaustion for a Phase that had spent almost no budget and hit no wall clock, and the continuation prompt told the model it had "stopped at the context budget" when it had not.
+
+The continuation allowance is kept — 7 of the 26 unmeasured continuations since 09-01 succeeded, so the fresh Session earns its place — but its stated cause is now the Session's own measurement. A continuation's reason is `timeout` when the nudge fired, `budget` when that Session's own occupancy reached the token warn or stop (turn events or the final `AgentResult`, sticky within the Session, cleared only by a fresh Session), and `blocked` otherwise. Three shapes of the prompt follow: the time-ceiling text, the context-threshold text, and a blocked text that names the cause, quotes the newest Envelope's notes as authoritative, says not to redo completed checks, and asks for `fail` naming the outside blocker if it is still unavailable.
+
+A second partial ends the Run `budget_exhausted` only when both partials were measured ceilings (`timeout`/`budget`). When either was `blocked` the Run fails honestly with `blocked: <newest Envelope notes>` and this role's session mapping is closed, so a `--resume` starts a brand-new Session for that role instead of rejoining a dead one. A partial returned from a claim-gate correction takes the same continuation path rather than the generic `reported status='partial'` error. The builder prompt reserves `partial` for a Session that ran out and `fail` for a named missing prerequisite; the documenter names work outside its ownership in its notes instead of reporting partial.
+
+We considered,
+
+- **Drop the continuation for unmeasured partials.** Rejected: the 7 successful continuations show the fresh Session resolves most of them; failing unmeasured partials outright was explicitly out of scope.
+- **Keep the one-label taxonomy (`budget`) and only fix the wording.** Rejected: the classification is what the Run outcome keys on, so a `blocked` partial cannot stay `budget` without a second partial still mislabelling as exhaustion.
+- **Report every second partial as `partial` and let a human sort it out.** Rejected: the Run status is the machine-readable outcome, and a `partial` that no ceiling caused is not exhaustion.
+
+Trade-offs accepted: a `blocked` continuation costs a fresh Session before the Run fails, and an honestly-blocked Phase no longer produces the familiar `budget_exhausted` status — resume semantics for that role change from rejoin to fresh start. The reason is internal only; it is never a schema field or a new Run status.

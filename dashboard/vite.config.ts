@@ -1,0 +1,29 @@
+import { fileURLToPath, URL } from "node:url";
+import { defineConfig } from "vite";
+import vue from "@vitejs/plugin-vue";
+import { apiPort } from "./server/port.ts";
+
+const API_PORT = apiPort();
+
+export default defineConfig({
+  plugins: [vue()],
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+      "@shared": fileURLToPath(new URL("./shared", import.meta.url)),
+    },
+  },
+  server: {
+    port: 4601,
+    proxy: {
+      "/api": {
+        target: `http://127.0.0.1:${API_PORT}`,
+        changeOrigin: true,
+      },
+    },
+  },
+  build: {
+    outDir: "dist",
+    emptyOutDir: true,
+  },
+});

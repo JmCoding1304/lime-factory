@@ -1,0 +1,33 @@
+[project]
+name = "limefactory"
+version = "0.1.0"
+description = "The smallest agent factory: ticket in, reviewed PR out."
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.13.5",
+    "pyyaml>=6",
+    "rich>=15.0.0",
+]
+
+[project.scripts]
+lime = "lime.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9.0,<0.10.0"]
+build-backend = "uv_build"
+
+# The importable package is `lime/` at the repo root (spec §2), not src/limefactory.
+[tool.uv.build-backend]
+module-name = "lime"
+module-root = ""
+
+[dependency-groups]
+dev = [
+    "jsonschema>=4.26.0",
+    "pytest>=8",
+    "pytest-xdist>=3.8.0",
+]
+
+[tool.pytest.ini_options]
+markers = ["real: drives a real, API-billed model call"]
+addopts = '-m "not real" -n auto --dist loadfile'

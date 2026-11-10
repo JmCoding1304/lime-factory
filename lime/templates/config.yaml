@@ -1,0 +1,124 @@
+# .lime/config.yaml — annotated template (2026-08-28). Committed, one per target project.
+# Every non-obvious choice is marked "lime:" with its reason.
+# Amended 2026-08-31: designer row + all-claude reshape; runs.ports, commands.typecheck|build.
+
+defaults:
+  runtime: pi                        # lime: was `coding_agent` — glossary term. pi | claude_code
+  model: openrouter/deepseek/deepseek-v4.1-flash   # pi: ALWAYS provider/model-id · claude_code: alias (haiku|sonnet|opus|fable) or full id
+                                     # lime: never anthropic/* on pi — Claude via openrouter/anthropic/*
+  thinking: medium                   # off|minimal|low|medium|high|xhigh|max — pi: --thinking · claude_code: --effort
+  harness_engineering: []            # pi extension paths (-e); the factory's guard and `submit.ts` are always added by the Spine (charter 8)
+  timeout_s: 1800                    # one Session's wall clock, seconds; every send in the Session draws from it, the one continuation re-arms it; a role may override, profiles may patch
+  tools: [read, bash, edit, write, grep, find, ls]   # ONE vocabulary (pi's). agent_cc maps read→Read bash→Bash edit→Edit
+                                                     # write→Write grep→Grep find→Glob; `ls` dropped with a warning.
+                                                     # lime: + `subagent` (pi: -e lime/harness_engineering/subagents.ts by absolute path + its 4 subagent_* tools · cc: Agent; planner only)
+                                                     #                   + `web` (pi: pi-web-access via -e · cc: WebSearch+WebFetch)
+  # lime: no `data_dir` / `observability` — runtime home and SQLite are fixed under .lime/runs/.
+  # lime: no `protected_files` — lives in the trust file (charter 8).
+
+agents:                              # a list, one entry per Role, merged key-by-key OVER defaults
+  - name: scout
+    purpose: Find and report where things live; change nothing.
+    color: "#fbbf24"
+    runtime: claude_code             # subscription default; scout's multi-part locate/reason loop rides claude_code
+    model: claude-haiku-5-5
+    thinking: medium
+    writes: []                       # read-only in the repo; context_handoff/ under .lime/runs/ is always writable
+    tools: [read, grep, find, ls, bash, write]
+    tool_choice: required                    # pi-only: auto | required; scout defaults to required to enforce structured tool calls
+  - name: researcher
+    purpose: Bring outside knowledge (docs, APIs) back as a short brief; change nothing.
+    color: "#34d399"
+    runtime: claude_code             # `lime research` default rides the subscription
+    model: sonnet
+    thinking: low
+    harness_engineering: [lime/harness_engineering/context7.ts]  # inert on claude_code, active when a profile moves researcher to pi
+    writes: []
+    tools: [read, grep, find, ls, bash, write, web]   # web = cc WebSearch+WebFetch · pi pi-web-access; cc user.md carries the context7 curl recipe
+  - name: planner
+    purpose: Turn a request into a plan the builder can implement without asking questions.
+    color: "#a78bfa"
+    runtime: claude_code             # charter 2: planner on the subscription
+    model: claude-opus-5-5[1m]       # Opus 5.5; [1m] = 1M window (bare id clamps to 200k)
+    thinking: xhigh                  # → --effort xhigh + alwaysThinkingEnabled
+    writes: []                       # the plan lands in context_handoff/, not the repo — no plan commit
+    tools: [read, grep, find, bash, write, subagent]
+  - name: builder
+    purpose: Implement the plan exactly; report every changed file in the envelope.
+    color: "#22d3ee"
+    thinking: high                    # builder-specific: high, overrides defaults.thinking: medium
+    # no `writes` → unrestricted, minus the trust file
+    tools: [read, grep, find, ls, bash, edit, write]
+  - name: reviewer
+    purpose: Confirm that what was built is what was asked for; change nothing.
+    color: "#fb7185"
+    model: openai-codex/gpt-6-astra   # Codex subscription via pi; different family from the builder (the reviewer never shares the builder's blind spots)
+    thinking: high
+    writes: []
+    tools: [read, grep, find, ls, write]   # no bash — the review envelope already carries the diff, changed files and verify result
+  - name: documenter
+    purpose: Keep AGENTS.md true, write ADRs and glossary entries from the diff; document only.
+    color: "#e879f9"
+    runtime: claude_code             # subscription default; durable docs/ADR writing justifies claude_code
+    model: claude-haiku-5-5
+    thinking: high
+    writes: [AGENTS.md, CONTEXT.md, docs/adr/]
+    tools: [read, grep, find, ls, bash, write, edit]
+
+  - name: designer                   # Upstream only, via `lime prototype`; never a chain step
+    purpose: Turn an ask into 2-3 clickable variants on one throwaway route; iterate until locked.
+    color: "#c1f610"
+    model: openrouter/moonshotai/kimi-k3
+    thinking: medium
+    writes: ["**/proto-<slug>/**"]   # glob computed from the CLI slug; main working tree, no worktree
+    tools: [read, grep, find, ls, bash, edit, write]
+
+profiles:                            # lime (charter 13): a PATCH with the base's shape; only runtime/model/thinking/timeout_s/tool_choice allowed.
+  # `default` = the base roster, needs no entry. Merge order: defaults ← agent ← profile. `lime run --profile X`.
+  quality:
+    defaults: {thinking: high}
+    agents:
+      - {name: builder,  model: openrouter/anthropic/claude-sonnet-5}
+  all-claude:                        # all subscription: defaults cover builder and researcher; scout/documenter inherit their explicit base settings
+    defaults: {runtime: claude_code, model: sonnet}
+    agents:
+      - {name: designer, model: opus}   # Opus 5: #1 WebDev Arena outright
+      - {name: reviewer, model: fable}
+      # planner already claude_code (Opus 5.5 xhigh) in the base roster; reviewer takes claude_code from this profile's defaults
+  api-research:                      # researcher off the subscription, onto pi + flash (+ context7.ts via base entry)
+    agents:
+      - {name: researcher, runtime: pi, model: openrouter/google/gemini-3.7-flash}
+
+commands:                            # lime (ADR 0001): these are not hard-coded in quality.py; they must come from the project
+  setup: pnpm install --frozen-lockfile && createdb -T app_template $LIME_DB_NAME   # once, after the worktree exists; env: LIME_RUN_ID, LIME_PORT, LIME_DB_NAME
+  test: pnpm test
+  lint: pnpm lint
+  typecheck: pnpm typecheck          # verify runs test -> lint -> typecheck -> build; absent keys skipped
+  build: pnpm build
+  teardown: dropdb $LIME_DB_NAME     # at `lime deploy` / `lime runs rm`; optional
+  # test_timeout: 600                # seconds the test command may run in verify and lime deploy's merged-tree check; whole number ≥ 1
+
+deploy:                              # run in order by the Deploy session; empty = skip
+  - vercel deploy --prod
+
+auto_deploy: off                     # off | staging | prod — what a `lime run … --deploy` batch's unattended merge ships to; off (or missing) refuses --deploy
+
+budget:                              # charter 6: uniform ceiling; an agent may carry its own `budget:` override.
+  warn: 150000
+  stop: 250000
+
+commit:                              # gate + commit exclusion patterns and line budget
+  exclude: [context_handoff/]         # staging exclusion: worktree-root-relative Git patterns; matched paths are kept out of
+                                     # `git add -A` and are ineligible for the line budget. Directories include descendants,
+                                     # glob patterns supported. An explicit empty list disables exclusions.
+  uncounted: []                      # accounting exemption only: matched paths still commit, but their added lines stay out
+                                     # of the line budget and top-offender ranking (e.g. a project-selected lockfile).
+                                     # Same root-relative Git patterns as exclude. On overlap, exclude wins (a path is not exempt).
+                                     # Neither list force-adds ignored files, waives the binary gate, or removes content already
+                                     # committed on the branch; raising max_added_lines is a separate, global choice.
+  max_added_lines: 1500              # sizing budget, never a stop: total counted added lines against base (not net additions);
+                                     # the planner sizes steps against it and verify logs it, the builder never sees it.
+                                     # Non-deleted binary content (new or modified) is always a violation, even if uncounted.
+
+runs:                                # the port range IS the parallel-Run cap; allocated under BEGIN IMMEDIATE
+  ports: 3100-3102

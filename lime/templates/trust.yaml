@@ -1,0 +1,29 @@
+# .lime/trust.yaml — the fences (spec §8). Four pattern lists, nothing more.
+# Committed, one per target project; the four keys are grilled at /lime install, never skipped.
+#
+# protected_files — enforced in code (permissions.py): snapshot → diff →
+#   rollback → PermissionBreach aborts the Phase. An agent touches one only by naming it
+#   in its own `writes:`.
+# secrets / branches / commands — rendered into every prompt as the {{never}} block;
+#   held by the reviewer's diff check and a push step that never targets a protected
+#   branch. No denylist hook (charter 7).
+
+protected_files:                   # in-repo: the fences + the stamp
+  - .lime/trust.yaml
+  - .lime/config.yaml
+  - .claude/skills/lime/
+
+secrets:
+  - .env
+  - .env.*
+  - "**/*.pem"
+  - "**/credentials*"
+
+branches:
+  - main
+  - master
+
+commands:
+  - git push --force
+  - git reset --hard
+  - rm -rf

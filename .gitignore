@@ -1,0 +1,10 @@
+.DS_Store
+.venv/
+__pycache__/
+dist/
+node_modules/
+*.tsbuildinfo
+# per-project Run state: lime.db + per-Run folders (spec §2)
+.lime/runs/
+.pi/
+.pytest_cache/

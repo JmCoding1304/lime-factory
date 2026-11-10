@@ -1,0 +1,21 @@
+# Rules reach every Role, and a configured prompt override that is missing fails loud
+
+A target project's `AGENTS.md` and `docs/adr/` never reached a Role: not by runtime context files (ADR 0014 keeps the harness agnostic; `agent_pi.py` passed `--no-context-files` and `agent_cc.py` passed `--setting-sources ""`), and not by any prompt variable — `agents.py` handed the templates only `prompt`, `previous_envelope`, `context_handoff_dir` and `never`. So the reviewer, planner and builder could approve or plan work that the project's own written rules forbid, with no text in their context to notice. Separately, prompt overrides were resolved as `[configured, package default]` candidates: a configured path that did not exist silently fell through to the shipped default, so a project could believe its `.lime/prompts/builder/system.md` was in force while the package default ran.
+
+1. **`rules` is the one channel, read fresh at render time.** `lime/rules.py::rules_block(root)` returns the target's `AGENTS.md` verbatim (`CLAUDE.md` fallback, `""` when neither exists), then `## ADRs` and one `NNNN slug` line per `docs/adr/*.md` taken from the filename — never the ADR body, never truncated. `agents.execute` passes it as the `rules` variable beside `never`, and every Role's `user.md` renders `{{rules}}` directly after the never block. Re-enabling runtime context files is not an option: ADR 0014 makes the harness agnostic, so the reference reaches the model through the prompt, where the Fence and the Trace already apply.
+
+2. **A rules conflict is blocking, never bypassed.** The reviewer flags a diff contradicting a rule, or an ADR whose title names a changed file (reading that ADR once) as blocking; the planner names a conflicting step at the top and `fail`s; the builder refuses to write contradicting code and stops `partial` naming the conflict. Nothing silently plans around, builds or approves against the project's own rules.
+
+3. **Overrides are opt-in and fail loud.** `prompts.resolve_path` selects the configured override path alone when one is set, raising `FileNotFoundError` naming that exact path when it is missing; only an unconfigured kind resolves to the package default. `lime check` reports the same missing configured path as a failure naming it. The shipped `lime/templates/config.yaml` no longer carries `prompt_engineering:` blocks, so `lime init` stamps no override and a fresh project passes `lime check` with no override files on disk.
+
+4. **The AGENTS.md ceiling is enforced, not just advised.** `lime check` fails when `AGENTS.md` exceeds 60 lines, naming the file; the cookbook's authoring target stays ≤40 lines. The block itself is never truncated — the ceiling is a diagnostic, not a clipping.
+
+We considered,
+
+- **Re-enable runtime context files in `agent_pi.py`/`agent_cc.py`.** Rejected: it contradicts ADR 0014's harness-agnostic rule and gives two runtimes two different context channels; `{{rules}}` is one.
+- **Judge the request, not the project's rules.** Rejected: a request the rules forbid is exactly the case that needs a refusal, and the prompt is the only place a Role can see the rule.
+- **Inject ADR bodies into the prompt.** Rejected: it would blow the context budget on every Role; the filename index plus one read of a named ADR is enough to tie a change to its rationale.
+- **Keep the silent package-default fallback for a missing configured override.** Rejected: a project would think its override was in force while the shipped default ran, which is the class of silent drift `lime check` exists to catch.
+- **Ship `prompt_engineering:` blocks in the template so the override paths are visible.** Rejected: they turned a shipped default into a directory of files a project was expected to supply; opt-in is a deliberate edit, not a stamped path.
+
+Trade-offs accepted: a project that wants an override must name it in `.lime/config.yaml` explicitly, and a broken path stops `lime check` and the Run at render time instead of quietly degrading to the default. `lime init` preserves an existing `.lime/config.yaml` (owner-managed), so an obsolete configured override path must be removed or supplied by hand. The documenter's own system prompt and the role `thinking:` levels are unchanged; injecting ADR bodies and a rules-only review pass remain out of scope.

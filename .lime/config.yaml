@@ -1,0 +1,168 @@
+# .lime/config.yaml — limefactory's own config (the factory is its own first target project, spec §2).
+# Roster/profiles copied verbatim from the package template (lime/templates/config.yaml, ticket 05/08/17);
+# `commands:`/`deploy:` are this repo's own (Python + uv, plus the Bun dashboard — `test` also runs `bun test` + `vue-tsc`, because the deploy gate runs only setup + test; no separate lint/typecheck/build keys).
+
+defaults:
+  runtime: pi
+  model: openrouter/deepseek/deepseek-v4.1-flash
+  thinking: high
+  harness_engineering: []
+  tools: [read, bash, edit, write, grep, find, ls]
+
+agents:
+- name: scout
+  purpose: Find and report where things live; change nothing.
+  color: '#fbbf24'
+  runtime: claude_code
+  model: claude-haiku-5-5   # 2026-10-11: Haiku 5.5 on the Claude subscription
+  thinking: medium
+  writes: []
+  tools:
+  - read
+  - grep
+  - find
+  - ls
+  - bash
+  - write
+  tool_choice: required
+- name: researcher
+  purpose: Bring outside knowledge (docs, APIs) back as a short brief; change nothing.
+  color: '#34d399'
+  runtime: claude_code
+  model: sonnet
+  thinking: low
+  harness_engineering:
+  - lime/harness_engineering/context7.ts
+  writes: []
+  tools:
+  - read
+  - grep
+  - find
+  - ls
+  - bash
+  - write
+  - web
+- name: planner
+  purpose: Turn a request into a plan the builder can implement without asking questions.
+  color: '#a78bfa'
+  runtime: claude_code
+  model: claude-opus-5-5[1m]   # 2026-10-11: Opus 5.5 xhigh on the Claude subscription; [1m] = the 1M window (200k clamp stopped planners at 160k)
+  thinking: xhigh
+  writes: []
+  tools:
+  - read
+  - grep
+  - find
+  - bash
+  - write
+  - subagent
+- name: builder
+  purpose: Implement the plan exactly; report every changed file in the envelope.
+  color: '#22d3ee'
+  runtime: pi
+  model: openrouter/deepseek/deepseek-v4.1-flash
+  thinking: high
+  tools:
+  - read
+  - grep
+  - find
+  - ls
+  - bash
+  - edit
+  - write
+- name: reviewer
+  purpose: Confirm that what was built is what was asked for; change nothing.
+  color: '#fb7185'
+  model: openai-codex/gpt-6-astra   # 2026-10-10: was xai/grok-4.6; GPT-6 Astra on the Codex subscription, high thinking
+  thinking: high
+  writes: []
+  tools:
+  - read
+  - grep
+  - find
+  - ls
+  - write
+- name: documenter
+  purpose: Keep AGENTS.md true, write ADRs and glossary entries from the diff; document
+    only.
+  color: '#e879f9'
+  runtime: claude_code
+  model: claude-haiku-5-5   # 2026-10-11: Haiku 5.5 on the Claude subscription
+  thinking: high
+  writes:
+  - AGENTS.md
+  - CONTEXT.md
+  - docs/adr/
+  tools:
+  - read
+  - grep
+  - find
+  - ls
+  - bash
+  - write
+  - edit
+- name: designer
+  purpose: Turn an ask into 2-3 clickable variants on one throwaway route; iterate
+    until locked.
+  color: '#c1f610'
+  model: openrouter/qwen/qwen3.8-max-0902   # 2026-09-07: the undated id is not in pi's catalog; this snapshot is
+  thinking: xhigh
+  writes:
+  - '**/proto-<slug>/**'
+  tools:
+  - read
+  - grep
+  - find
+  - ls
+  - bash
+  - edit
+  - write
+  runtime: pi
+profiles:
+  quality:                           # 2026-09-19: was openrouter/anthropic/claude-sonnet-5 = OpenRouter cash ($5.61 on run ec85cd7f); now Sonnet on the subscription
+    agents:
+    - name: builder
+      runtime: claude_code
+      model: sonnet
+  all-claude:
+    defaults:
+      runtime: claude_code
+      model: sonnet
+    agents:
+    - name: scout
+      model: haiku
+    - name: reviewer
+      model: fable
+    - name: builder
+      model: sonnet
+      runtime: claude_code
+    - name: planner
+      model: claude-opus-5-5[1m]   # 2026-10-11: Opus 5.5 xhigh; bare entry fell back to the sonnet default
+      thinking: xhigh
+  api-research:
+    agents:
+    - name: researcher
+      runtime: pi
+      model: openrouter/google/gemini-3.7-flash
+  api-fallback:
+    agents:
+    - name: planner
+      runtime: pi
+      model: openai-codex/gpt-6-astra
+      thinking: high
+commands:                            # this repo: Python + uv (dev deps via `dependency-groups.dev`) + the Bun dashboard
+  setup: uv sync && cd dashboard && bun install --frozen-lockfile   # no bun on PATH → sh exits 127 naming bun → no Run
+  test: uv run pytest -q && cd dashboard && bun test 2>&1 && bunx vue-tsc --noEmit   # bun test reports on stderr; 2>&1 keeps a vue-tsc error inside the verify tail
+  teardown: rm -rf .venv
+  test_timeout: 1500                 # ticket 272: ~2400 pytest + bun test + vue-tsc runs past 600 s with three Runs building at once
+
+deploy: []                           # limefactory ships as a package, not a deployed service — nothing to run here
+
+auto_deploy: prod                    # 2026-11-03: a `lime run … --deploy` batch merges each green ticket unattended; merged main = the live editable install
+
+budget:
+  warn: 150000
+  stop: 250000
+
+runs:
+  ports: 3100-3102
