@@ -44,7 +44,10 @@
     "jsdom": "^31.0.0",
     "oxlint": "^1",
     "typescript": "^5.7.2",
-    "vite": "^7",
+    "vite": "^7.3.8",
     "vue-tsc": "^3"
+  },
+  "overrides": {
+    "source-map-js": "^1.2.2"
   }
 }
