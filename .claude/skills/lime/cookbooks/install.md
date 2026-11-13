@@ -1,6 +1,6 @@
 # install — putting the factory into a target project
 
-By hand, once: clone limefactory and run `uv tool install --editable .` from the clone (puts `lime` on PATH, tracking that checkout); then, in the target project, `lime init` (idempotent, owner-split — factory files always rewritten, user files never touched). On a terminal it also runs a short setup wizard; an agent session has no terminal, but pass `--no-input` so it can never wait for answers. Then `/lime install` here, steps below.
+By hand, once, in the target project: `uv tool install limefactory && lime init` (idempotent, owner-split — factory files always rewritten, user files never touched). Then `/lime install` here, steps below.
 
 1. **Precondition** — no `.git`: `git init -b main`, put trust `secrets:` in `.gitignore`, `git add -A`, commit `chore: initial commit` with trailer `Lime-Role: orchestrator`, carry on. An existing repo: clean tree, on the default branch — anything else: stop and say why, don't improvise a workaround.
 2. **Branch** — `lime/install`. Two commits land here, both trailer `Lime-Role: orchestrator` (no Run, so no `Lime-Run`).
