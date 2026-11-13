@@ -4,7 +4,7 @@
 
 defaults:
   runtime: pi
-  model: openrouter/deepseek/deepseek-v4.1-flash
+  model: openrouter/deepseek/deepseek-v4.1-flash-1017
   thinking: high
   harness_engineering: []
   tools: [read, bash, edit, write, grep, find, ls]
@@ -60,7 +60,7 @@ agents:
   purpose: Implement the plan exactly; report every changed file in the envelope.
   color: '#22d3ee'
   runtime: pi
-  model: openrouter/deepseek/deepseek-v4.1-flash
+  model: openrouter/deepseek/deepseek-v4.1-flash-1017
   thinking: high
   tools:
   - read
